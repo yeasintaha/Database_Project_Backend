@@ -521,6 +521,28 @@ app.get("/api/get/search_employee/mail/:search", async function (req, res) {
 /// Product
 //
 //
+app.delete("/api/delete/product/:deleted_id", async function (req, res) {
+  let connection;
+  connection = await oracledb.getConnection({
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    connectString: "localhost/XE",
+  });
+  const deleted_id = req.params.deleted_id;
+  console.log(" product id delete : ", deleted_id);
+  try {
+    const query = await connection.execute(
+      `delete from product 
+    where product_id=:id`,
+      [deleted_id]
+    );
+    connection.commit();
+    console.log("Delete successful ", query.rowsAffected);
+  } catch (err) {
+    console.error(err);
+  }
+  await connection.close();
+});
 app.post("/api/insert/product", async function (req, res) {
   let connection;
   connection = await oracledb.getConnection({
@@ -792,6 +814,16 @@ app.post("/api/insert/supplies", async function (req, res) {
     console.error(err);
   }
   await connection.close();
+});
+app.get("/api/get/admin", async function (req, res) {
+  let connection;
+  connection = await oracledb.getConnection({
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    connectString: "localhost/XE",
+  });
+  const sql = await connection.execute(`select * from admin `);
+  res.send(sql.rows);
 });
 
 app.listen(port, () => console.log(`Listening on localhost:${port}`));
