@@ -303,19 +303,47 @@ app.put("/api/update/customer", async function (req, res) {
     password: process.env.PASSWORD,
     connectString: "localhost/XE",
   });
-  const updated_name = req.body.updated_cust_name;
-  const name = req.body.cust_name;
-  console.log(" Updated name : ", updated_name);
-  console.log("Previous name : ", name);
+  const name = req.body.name;
+  const phone = req.body.phone;
+  const mail = req.body.mail;
+  const gender = req.body.gender;
+  const house = req.body.house;
+  const street = req.body.street;
+  const postal = req.body.postal;
+  const previous_mail = req.body.previous_mail;
+  // console.log("Address ", house, " ", street, " ", postal);
   try {
     const query = await connection.execute(
-      `update customer 
-    set cust_name =:updated_name
-    where cust_name=:name`,
-      [updated_name, name]
+      `update customer c
+    set c.cust_name =:name , c.cust_mail=:mail,c.cust_phone=:phone,c.cust_gender =:gender,
+    c.cust_address.house_no=:house, c.cust_address.street_no = :street,c.cust_address.postal_code = :postal
+    where cust_mail=:previous_mail`,
+      [name, mail, phone, gender, house, street, postal, previous_mail]
     );
     connection.commit();
     console.log("Update successful ", query.rowsAffected);
+  } catch (err) {
+    console.error("There are some error ");
+  }
+  await connection.close();
+});
+app.get("/api/get/customer/:cust_mail", async function (req, res) {
+  let connection;
+  connection = await oracledb.getConnection({
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    connectString: "localhost/XE",
+  });
+  const mail = req.params.cust_mail;
+  try {
+    const query = await connection.execute(
+      `select * from customer 
+        where cust_mail = :mail
+      `,
+      [mail]
+    );
+    res.send(query.rows);
+    connection.commit();
   } catch (err) {
     console.error("There are some error ");
   }
