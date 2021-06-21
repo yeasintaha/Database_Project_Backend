@@ -87,6 +87,23 @@ app.get("/api/get/order_info", async function (req, res) {
   await connection.close();
 });
 
+app.get("/api/get/order_info/:order_id", async function (req, res) {
+  let connection;
+  connection = await oracledb.getConnection({
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    connectString: "localhost/XE",
+  });
+  try {
+    let order_id = req.params.order_id;
+    const sql = await connection.execute(`select * from order_info`);
+    res.send(sql.rows);
+  } catch (err) {
+    console.log(err);
+  }
+  await connection.close();
+});
+
 app.post("/api/insert/supplier", async function (req, res) {
   let connection;
   connection = await oracledb.getConnection({
@@ -107,10 +124,10 @@ app.post("/api/insert/supplier", async function (req, res) {
   try {
     const sql = await connection.execute(
       `BEGIN
-         insert_supplier(:id,:name,:mail,:phone,:house,:street,:postal);
+         insert_supplier(sq_supplier_id.nextval,:name,:mail,:phone,:house,:street,:postal);
         END;
         `,
-      [id, name, mail, phone, house, street, postal]
+      [name, mail, phone, house, street, postal]
     );
     connection.commit();
     console.log("Insertion successful ", sql.rowsAffected);
@@ -296,7 +313,7 @@ app.get("/api/get/new_customer_id", async function (req, res) {
   res.send(last_id);
 });
 
-app.put("/api/update/customer", async function (req, res) {
+app.post("/api/update/customer", async function (req, res) {
   let connection;
   connection = await oracledb.getConnection({
     user: process.env.USER,
@@ -305,7 +322,6 @@ app.put("/api/update/customer", async function (req, res) {
   });
   const name = req.body.name;
   const phone = req.body.phone;
-  const mail = req.body.mail;
   const gender = req.body.gender;
   const house = req.body.house;
   const street = req.body.street;
@@ -315,15 +331,16 @@ app.put("/api/update/customer", async function (req, res) {
   try {
     const query = await connection.execute(
       `update customer c
-    set c.cust_name =:name , c.cust_mail=:mail,c.cust_phone=:phone,c.cust_gender =:gender,
+    set c.cust_name =:name ,c.cust_phone=:phone,c.cust_gender =:gender,
     c.cust_address.house_no=:house, c.cust_address.street_no = :street,c.cust_address.postal_code = :postal
     where cust_mail=:previous_mail`,
-      [name, mail, phone, gender, house, street, postal, previous_mail]
+      [name, phone, gender, house, street, postal, previous_mail]
     );
+    console.log(gender, " and ", previous_mail);
     connection.commit();
     console.log("Update successful ", query.rowsAffected);
   } catch (err) {
-    console.error("There are some error ");
+    console.error(err);
   }
   await connection.close();
 });
@@ -586,24 +603,34 @@ app.post("/api/insert/product", async function (req, res) {
   qty = req.body.qty;
   price = req.body.price;
   category = req.body.category;
-  console.log(
-    "Everything is here ",
-    id,
-    name,
-    image,
-    price,
-    qty,
-    price,
-    category
-  );
+  console.log("Product info ", id, name, image, price, qty, price, category);
   try {
     const sql = await connection.execute(
-      `insert into product 
+      `insert into product (product_id,product_name,product_quantity,product_price,product_image,product_category)
       values(:id,:name,:qty,:price,:image,:category)
         `,
       [id, name, qty, price, image, category]
     );
     connection.commit();
+
+    const update_product_category = await connection.execute(
+      ` UPDATE PRODUCT 
+        SET PRODUCT_UNIT= CASE 
+            WHEN  lower(PRODUCT_CATEGORY)='fruits' AND lower(PRODUCT_NAME)='banana' THEN '1 dozen'
+            WHEN  lower(PRODUCT_CATEGORY)='fruits' THEN '1 kg'
+            WHEN lower(PRODUCT_CATEGORY)='grocery' AND lower(PRODUCT_NAME) ='egg' THEN '1 dozen'
+            WHEN lower(PRODUCT_CATEGORY)='grocery' AND lower(PRODUCT_NAME) LIKE '%oil%' THEN '1 L'
+            WHEN lower(PRODUCT_CATEGORY)='grocery' AND lower(PRODUCT_NAME) !='egg' THEN '1 kg'
+            WHEN lower(PRODUCT_CATEGORY)='dairy' THEN '1 L'
+            ELSE '1 kg'
+            END
+      `
+    );
+    connection.commit();
+    console.log(
+      "Affected rows products ",
+      update_product_category.rowsAffected
+    );
     console.log("Insertion successful ", sql.rowsAffected);
   } catch (err) {
     console.error(err);
@@ -723,6 +750,23 @@ app.get(
     res.send(result.outBinds);
   }
 );
+
+app.get("/api/get/popular_products", async function (req, res) {
+  let connection;
+  connection = await oracledb.getConnection({
+    user: process.env.USER,
+    password: process.env.PASSWORD,
+    connectString: "localhost/XE",
+  });
+  const sql = await connection.execute(
+    `SELECT count(bc.product_id) AS product_count , bc.product_id,p.PRODUCT_NAME,p.PRODUCT_CATEGORY,
+    p.PRODUCT_IMAGE ,p.PRODUCT_PRICE,p.product_UNIT FROM BUY_CART bc
+    INNER JOIN product p ON bc.PRODUCT_ID =p.PRODUCT_ID 
+    GROUP BY bc.product_id,p.PRODUCT_NAME,p.PRODUCT_CATEGORY,p.PRODUCT_IMAGE ,
+    p.PRODUCT_PRICE,p.PRODUCT_UNIT ORDER BY product_count desc`
+  );
+  res.send(sql.rows);
+});
 app.get("/api/get/product", async function (req, res) {
   let connection;
   connection = await oracledb.getConnection({
@@ -761,61 +805,79 @@ app.get(
   }
 );
 
-app.get("/api/get/order_id_from_cust_name/:cust_id", async function (req, res) {
-  let connection;
-  connection = await oracledb.getConnection({
-    user: process.env.USER,
-    password: process.env.PASSWORD,
-    connectString: "localhost/XE",
-  });
-  const id = req.params.cust_id;
-  await connection.execute(
-    `BEGIN
+app.get(
+  "/api/get/order_id_from_cust_mail/:cust_mail",
+  async function (req, res) {
+    let connection;
+    connection = await oracledb.getConnection({
+      user: process.env.USER,
+      password: process.env.PASSWORD,
+      connectString: "localhost/XE",
+    });
+    const mail = req.params.cust_mail;
+    const result = await connection.execute(
+      `SELECT oi.ORDER_ID,c.cust_name,c.cust_id,c.cust_mail
+      FROM customer C 
+      INNER JOIN BUY_CART bc 
+      ON bc.cust_id = c.cust_id
+      INNER JOIN ORDER_INFO oi 
+      ON oi.order_id = bc.ORDER_ID 
+      GROUP BY c.cust_id,oi.ORDER_ID,c.cust_name,c.cust_mail
+      having c.cust_mail = :mail
+      `,
+      [mail]
+    );
+    res.send(result.rows);
+  }
+);
+
+app.get(
+  "/api/get/order_id_from_cust_name_function/:cust_id",
+  async function (req, res) {
+    let connection;
+    connection = await oracledb.getConnection({
+      user: process.env.USER,
+      password: process.env.PASSWORD,
+      connectString: "localhost/XE",
+    });
+    const id = req.params.cust_id;
+    await connection.execute(
+      `BEGIN
         DBMS_OUTPUT.ENABLE(NULL);
       END;`
-  );
+    );
 
-  await connection.execute(
-    `BEGIN
+    await connection.execute(
+      `BEGIN
        dbms_output.get_line(get_order_id_from_cust_id(:id));
       END;
       `,
-    [id]
-  );
+      [id]
+    );
 
-  let result;
-  do {
-    result = await connection.execute(
-      `BEGIN
+    let result;
+    do {
+      result = await connection.execute(
+        `BEGIN
            DBMS_OUTPUT.GET_LINE(:ln, :st);
          END;`,
-      {
-        ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 32767 },
-        st: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        {
+          ln: { dir: oracledb.BIND_OUT, type: oracledb.STRING, maxSize: 32767 },
+          st: { dir: oracledb.BIND_OUT, type: oracledb.NUMBER },
+        }
+      );
+      if (result.outBinds.st === 0) {
+        console.log(result.outBinds.ln);
       }
-    );
-    if (result.outBinds.st === 0) {
-      console.log(result.outBinds.ln);
-    }
-  } while (result.outBinds.st === 0);
-
-  // while ((row = await rs.getRow())) {
-  //   console.log(row);
-
-  // }
-});
+    } while (result.outBinds.st === 0);
+  }
+);
 
 ///
 ///
 /// Supplies
 ///
 ///
-/*
-BEGIN
-	insert_supplies('2','3',CURRENT_TIMESTAMP);
-END;
-
-*/
 
 app.post("/api/insert/supplies", async function (req, res) {
   let connection;
@@ -843,6 +905,70 @@ app.post("/api/insert/supplies", async function (req, res) {
   }
   await connection.close();
 });
+
+//
+//
+/// Buy Cart
+//
+//
+
+/*
+
+
+
+
+*/
+app.get(
+  "/api/get/order_table_from_cust_mail/:cust_mail",
+  async function (req, res) {
+    let connection;
+    connection = await oracledb.getConnection({
+      user: process.env.USER,
+      password: process.env.PASSWORD,
+      connectString: "localhost/XE",
+    });
+    const mail = req.params.cust_mail;
+    const sql = await connection.execute(
+      `
+    SELECT oi.order_id,oi.ORDER_TOTAL_COST ,oi.order_time,oi.order_quantity,c.cust_mail,c.cust_name
+    FROM order_info oi INNER JOIN BUY_CART bc ON bc.ORDER_ID = oi.ORDER_ID 
+    INNER JOIN CUSTOMER c ON c.CUST_ID = bc.CUST_ID 
+    GROUP BY oi.order_id,oi.ORDER_TOTAL_COST ,oi.order_time,oi.order_quantity,bc.ORDER_ID ,c.CUST_ID ,c.CUST_MAIL,c.cust_name 
+    having c.CUST_MAIL = :mail
+    ORDER BY oi.ORDER_ID  
+  `,
+      [mail]
+    );
+    res.send(sql.rows);
+  }
+);
+
+app.get(
+  "/api/get/order_details_from_cust_mail/:cust_mail",
+  async function (req, res) {
+    let connection;
+    connection = await oracledb.getConnection({
+      user: process.env.USER,
+      password: process.env.PASSWORD,
+      connectString: "localhost/XE",
+    });
+    const mail = req.params.cust_mail;
+    const sql = await connection.execute(
+      `
+    SELECT bc.PRODUCT_ID,bc.ORDER_ID ,p.PRODUCT_ID ,p.PRODUCT_NAME ,p.PRODUCT_IMAGE ,p.PRODUCT_PRICE ,bc.PRODUCT_SELECTED_QUANTITY 
+    FROM BUY_CART bc
+    INNER JOIN PRODUCT p ON p.PRODUCT_ID =bc.PRODUCT_ID 
+    WHERE bc.cust_id = 
+    (SELECT cust_id FROM customer WHERE cust_mail= :mail)
+    ORDER BY order_id 
+   
+  `,
+      [mail]
+    );
+    res.send(sql.rows);
+  }
+);
+
 app.get("/api/get/admin", async function (req, res) {
   let connection;
   connection = await oracledb.getConnection({
