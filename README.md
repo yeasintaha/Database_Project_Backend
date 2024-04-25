@@ -1,4 +1,4 @@
-﻿# Oracle SQL-Powered Grocery Store Backend
+﻿# Oracle SQL-Powered Grocery Store Backend: Efficient Data Management
 
  In this project, an Oracle SQL database serves as the backbone of the grocery store backend, providing a reliable and efficient data management solution. The SQL database is meticulously designed to accommodate various aspects of the grocery store's operations, including inventory management, customer information, order processing, and transaction tracking.
 
