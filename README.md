@@ -6,12 +6,12 @@ The relational database model is implemented to organize data into structured ta
 
 Key features of the SQL database include:
 
-    `Inventory Management`: Tables are structured to store detailed information about available products, including item names, descriptions, quantities, prices, and suppliers. SQL queries enable seamless inventory tracking, stock replenishment, and product updates.
+`Inventory Management`: Tables are structured to store detailed information about available products, including item names, descriptions, quantities, prices, and suppliers. SQL queries enable seamless inventory tracking, stock replenishment, and product updates.
 
-    `Customer Information`: Customer data, such as names, contact details, and purchase history, are stored in designated tables. The relational database allows for efficient customer management, personalized marketing strategies, and targeted promotions based on purchasing behavior.
+`Customer Information`: Customer data, such as names, contact details, and purchase history, are stored in designated tables. The relational database allows for efficient customer management, personalized marketing strategies, and targeted promotions based on purchasing behavior.
 
-    `Order Processing`: Orders placed by customers are recorded in the database, with details such as order IDs, timestamps, item quantities, and total amounts. SQL queries facilitate order fulfillment, inventory deduction, and order status updates in real-time.
+`Order Processing`: Orders placed by customers are recorded in the database, with details such as order IDs, timestamps, item quantities, and total amounts. SQL queries facilitate order fulfillment, inventory deduction, and order status updates in real-time.
 
-    `Transaction Tracking`: Transaction records, including payment methods, transaction IDs, and transaction statuses, are stored in the SQL database. This enables accurate financial reporting, reconciliation, and auditing of all transactions conducted within the grocery store platform.
+`Transaction Tracking`: Transaction records, including payment methods, transaction IDs, and transaction statuses, are stored in the SQL database. This enables accurate financial reporting, reconciliation, and auditing of all transactions conducted within the grocery store platform.
 
 Overall, the Oracle SQL database plays a pivotal role in ensuring the smooth operation and management of the grocery store backend, providing a robust foundation for data storage, retrieval, and manipulation.
